@@ -32,6 +32,7 @@ export const Store = {
   memberById(id) { return this.state.members.find((m) => m.id === id) || null; },
   isOwner() { const s = this.state; return !!(s.owner && s.authUser && s.owner.uid === s.authUser.uid); },
   isAdmin() { return this.isOwner() || !!this.me()?.isAdmin; },
+  canScore() { return !!this.me()?.canScore; },   // may change dishwashing points
 
   /** Which screen to show. */
   phase() {
