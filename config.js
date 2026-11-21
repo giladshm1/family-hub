@@ -26,9 +26,9 @@ export const APP_CONFIG = {
  *  - avatar:   an emoji, or '' to show the first letter of the name
  */
 export const DEFAULT_MEMBERS = [
-  { id: 'dad',   name: 'אבא',  avatar: '👨', color: '#6366F1', isAdmin: true, canScore: true },
-  { id: 'mom',   name: 'אמא',  avatar: '👩', color: '#EC4899', isAdmin: true },
-  { id: 'gilad', name: 'גלעד', avatar: '',   color: '#0EA5E9' },
+  { id: 'dad',   name: 'אבא',  avatar: '👨', color: '#6366F1', canScore: true },
+  { id: 'mom',   name: 'אמא',  avatar: '👩', color: '#EC4899'  },
+  { id: 'gilad', name: 'גלעד', avatar: '',   color: '#0EA5E9', isAdmin: true },
   { id: 'ori',   name: 'אורי', avatar: '',   color: '#10B981' },
   { id: 'roni',  name: 'רוני', avatar: '',   color: '#F59E0B' },
   { id: 'noam',  name: 'נועם', avatar: '',   color: '#8B5CF6' },
@@ -37,12 +37,12 @@ export const DEFAULT_MEMBERS = [
 
 /** Cars. If you add a car, also add its id to the list in firestore.rules. `icon` = Lucide icon name. */
 export const CARS = [
-  { id: 'car1', name: 'רכב 1 - משפחתי',  short: 'המשפחתי',  description: '7 מקומות · לנסיעות ארוכות', icon: 'car',       color: '#6366F1' },
-  { id: 'car2', name: 'רכב 2 - קומפקטי', short: 'הקומפקטי', description: 'חסכוני · נוח לחניה בעיר',     icon: 'car-front', color: '#14B8A6' },
+  { id: 'car1', name: 'רכב 1 - סיטרואן',  short: 'סיסי',  description: '', icon: 'car',       color: '#6366F1' },
+  { id: 'car2', name: 'רכב 2 - יונדאי', short: 'קוני', description: '',     icon: 'car-front', color: '#14B8A6' },
 ];
 
 /** Quick-pick notes under the booking form. */
-export const NOTE_PRESETS = ['אימון', 'סידורים', 'עבודה', 'קניות', 'חוג', 'בילוי'];
+export const NOTE_PRESETS = ['דייט' ,'אימון', 'סידורים', 'עבודה', 'קניות', 'חוג', 'בילוי'];
 
 /** Colors offered when adding a family member. */
 export const MEMBER_COLORS = ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#0EA5E9', '#8B5CF6', '#EF4444', '#14B8A6'];
