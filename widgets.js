@@ -54,7 +54,8 @@ const LeaderboardWidget = {
   render({ state }) {
     const canEdit = Store.canScore();
     const scoreOf = (m) => Math.max(0, m.score || 0);
-    const members = [...state.members].sort((a, b) => scoreOf(b) - scoreOf(a) || a.name.localeCompare(b.name, 'he'));
+    const members = state.members.filter((m) => m.inDishes !== false)   // only members in the dishes table
+      .sort((a, b) => scoreOf(b) - scoreOf(a) || a.name.localeCompare(b.name, 'he'));
     const max = Math.max(1, ...members.map(scoreOf));
     const total = members.reduce((s, m) => s + scoreOf(m), 0);
     const rankOf = (m) => 1 + members.filter((o) => scoreOf(o) > scoreOf(m)).length;
@@ -529,6 +530,11 @@ const FamilyWidget = {
                 </span>`).join('') : '<span class="text-xs text-slate-400">עוד לא חובר חשבון</span>'}
             </div>
           </div>
+          <label class="flex items-center gap-2 text-sm font-semibold text-slate-600 cursor-pointer">
+            <input type="checkbox" class="peer sr-only" data-input="family:dishes" data-member="${m.id}" ${m.inDishes !== false ? 'checked' : ''} />
+            <span class="relative w-10 h-6 rounded-full bg-slate-200 transition peer-checked:bg-emerald-400 after:absolute after:top-1 after:right-1 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:-translate-x-4"></span>
+            בטבלת הכלים
+          </label>
           <label class="flex items-center gap-2 text-sm font-semibold text-slate-600 ${self ? 'opacity-50' : 'cursor-pointer'}" title="${self ? 'אי אפשר להסיר הרשאה מעצמך' : ''}">
             <input type="checkbox" class="peer sr-only" data-input="family:admin" data-member="${m.id}" ${m.isAdmin ? 'checked' : ''} ${self ? 'disabled' : ''} />
             <span class="relative w-10 h-6 rounded-full bg-slate-200 transition peer-checked:bg-amber-400 after:absolute after:top-1 after:right-1 after:w-4 after:h-4 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:-translate-x-4"></span>
@@ -580,6 +586,14 @@ const FamilyWidget = {
       try {
         await Data.updateMember(m.id, { isAdmin: el.checked });
         Toast.show(el.checked ? `${m.name} עכשיו מורשה` : `${m.name} כבר לא מורשה`, 'info');
+      } catch (err) { el.checked = !el.checked; throw err; }
+    },
+    async 'family:dishes'(el) {
+      const m = Store.memberById(el.dataset.member);
+      if (!m) return;
+      try {
+        await Data.updateMember(m.id, { inDishes: el.checked });
+        Toast.show(el.checked ? `${m.name} נוסף/ה לטבלת הכלים` : `${m.name} הוסר/ה מטבלת הכלים`, 'info');
       } catch (err) { el.checked = !el.checked; throw err; }
     },
     'family:edit'(el) {
