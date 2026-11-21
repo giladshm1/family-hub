@@ -24,10 +24,11 @@ export const APP_CONFIG = {
  *  - isAdmin:  approves new accounts, edits members, cancels any booking
  *  - canScore: may change dishwashing points (can only be changed in the Firebase console)
  *  - avatar:   an emoji, or '' to show the first letter of the name
+ *  - inDishes: false = not shown in the dishwashing table (default: shown)
  */
 export const DEFAULT_MEMBERS = [
-  { id: 'dad',   name: 'אבא',  avatar: '👨', color: '#6366F1', canScore: true },
-  { id: 'mom',   name: 'אמא',  avatar: '👩', color: '#EC4899'  },
+  { id: 'dad',   name: 'אבא',  avatar: '👨', color: '#6366F1', canScore: true, inDishes: false },
+  { id: 'mom',   name: 'אמא',  avatar: '👩', color: '#EC4899', inDishes: false },
   { id: 'gilad', name: 'גלעד', avatar: '',   color: '#0EA5E9', isAdmin: true },
   { id: 'ori',   name: 'אורי', avatar: '',   color: '#10B981' },
   { id: 'roni',  name: 'רוני', avatar: '',   color: '#F59E0B' },
