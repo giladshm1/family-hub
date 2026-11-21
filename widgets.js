@@ -45,13 +45,14 @@ const LeaderboardWidget = {
   span: 'lg:col-span-1',
   _bump: null,
 
-  headerExtra({ isAdmin }) {
-    return isAdmin
+  headerExtra() {
+    return Store.canScore()
       ? `<span class="inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-700 ring-1 ring-amber-200 px-2.5 py-1 text-xs font-bold">${icon('shield-check', 'w-3.5 h-3.5')} עריכה</span>`
       : `<span class="inline-flex items-center gap-1 rounded-full bg-slate-100 text-slate-500 px-2.5 py-1 text-xs font-bold">${icon('lock', 'w-3.5 h-3.5')} צפייה</span>`;
   },
 
-  render({ state, isAdmin }) {
+  render({ state }) {
+    const canEdit = Store.canScore();
     const scoreOf = (m) => Math.max(0, m.score || 0);
     const members = [...state.members].sort((a, b) => scoreOf(b) - scoreOf(a) || a.name.localeCompare(b.name, 'he'));
     const max = Math.max(1, ...members.map(scoreOf));
@@ -81,7 +82,7 @@ const LeaderboardWidget = {
       const rankBadge = medal
         ? `<span class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style="background:${medal.bg}; color:${medal.fg}; box-shadow: inset 0 0 0 1.5px ${medal.ring}" title="${medal.label}">${icon(medal.icon, 'w-[18px] h-[18px]')}</span>`
         : `<span class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-slate-50 text-slate-400 text-sm font-bold">${rank}</span>`;
-      const controls = isAdmin
+      const controls = canEdit
         ? `<div class="flex items-center gap-1.5 shrink-0">
              <button class="score-btn bg-slate-100 text-slate-500 hover:bg-rose-100 hover:text-rose-600" data-action="score:change" data-member="${m.id}" data-delta="-1" ${score <= 0 ? 'disabled' : ''} aria-label="הורד נקודה ל${Utils.esc(m.name)}">${icon('minus', 'w-4 h-4')}</button>
              <button class="score-btn bg-emerald-500 text-white shadow-md shadow-emerald-500/30 hover:bg-emerald-600" data-action="score:change" data-member="${m.id}" data-delta="1" aria-label="הוסף נקודה ל${Utils.esc(m.name)}">${icon('plus', 'w-4 h-4')}</button>
@@ -104,16 +105,17 @@ const LeaderboardWidget = {
         </li>`;
     }).join('');
 
-    const footer = isAdmin
-      ? `<p class="mt-4 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">${icon('shield-check', 'w-4 h-4 shrink-0')} מצב מנהל פעיל — אפשר להוסיף או להוריד נקודות.</p>`
-      : `<p class="mt-4 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">${icon('lock', 'w-4 h-4 shrink-0')} רק בני משפחה מורשים יכולים לעדכן את הניקוד.</p>`;
+    const keepers = state.members.filter((m) => m.canScore).map((m) => m.name).join(', ') || 'מנהל';
+    const footer = canEdit
+      ? `<p class="mt-4 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 rounded-xl px-3 py-2">${icon('shield-check', 'w-4 h-4 shrink-0')} מצב עריכה פעיל — אפשר להוסיף או להוריד נקודות.</p>`
+      : `<p class="mt-4 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">${icon('lock', 'w-4 h-4 shrink-0')} רק ${Utils.esc(keepers)} יכול לעדכן את הניקוד.</p>`;
 
     return `${banner}<ul class="space-y-1.5">${rows}</ul>${footer}`;
   },
 
   actions: {
     async 'score:change'(el) {
-      if (!Store.isAdmin()) return Toast.show('רק בני משפחה מורשים יכולים לעדכן ניקוד', 'error');
+      if (!Store.canScore()) return Toast.show('אין לך הרשאה לעדכן את הניקוד', 'error');
       const m = Store.memberById(el.dataset.member);
       const delta = Number(el.dataset.delta);
       if (!m || (m.score || 0) + delta < 0) return;
@@ -518,7 +520,7 @@ const FamilyWidget = {
         <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3">
           ${avatarHtml(m, 'md')}
           <div class="flex-1 min-w-[9rem]">
-            <div class="flex items-center gap-1.5 font-bold text-slate-800">${Utils.esc(m.name)} ${self ? '<span class="text-xs font-semibold text-slate-400">(את/ה)</span>' : ''}</div>
+            <div class="flex items-center gap-1.5 font-bold text-slate-800">${Utils.esc(m.name)} ${self ? '<span class="text-xs font-semibold text-slate-400">(את/ה)</span>' : ''}${m.canScore ? '<span class="rounded-full bg-amber-50 text-amber-700 px-2 py-0.5 text-[11px] font-bold">מעדכן ניקוד</span>' : ''}</div>
             <div class="mt-1 flex flex-wrap gap-1.5">
               ${accounts.length ? accounts.map((l) => `
                 <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 pl-1 pr-2.5 py-0.5 text-xs text-slate-600" dir="ltr">
