@@ -4,7 +4,7 @@
  *
  * Firestore layout:
  *   meta/owner          { uid, email, at }           first person to set up = owner (always admin)
- *   members/{id}        { name, avatar, color, isAdmin, score, order }
+ *   members/{id}        { name, avatar, color, isAdmin, canScore, score, order }
  *   links/{uid}         { memberId, email, name }    Google account -> family member
  *   pending/{uid}       { email, name, photoURL, at } sign-ins waiting for an admin
  *   reservations/{id}   { carId, memberId, uid, start, end, note, createdAt }
@@ -80,7 +80,7 @@ export const Data = {
       const batch = writeBatch(db);
       DEFAULT_MEMBERS.forEach((m, i) => {
         const { id, ...rest } = m;
-        batch.set(doc(db, 'members', id), { ...rest, isAdmin: m.isAdmin || id === memberId, score: 0, order: i });
+        batch.set(doc(db, 'members', id), { ...rest, isAdmin: !!m.isAdmin || id === memberId, canScore: !!m.canScore, score: 0, order: i });
       });
       await batch.commit();
     }
