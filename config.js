@@ -21,13 +21,18 @@ export const APP_CONFIG = {
 /**
  * Starting family members — used ONLY on first setup to seed the database.
  * After that, members live in the database and admins edit them in "ניהול משפחה".
+ *  - isAdmin:  approves new accounts, edits members, cancels any booking
+ *  - canScore: may change dishwashing points (can only be changed in the Firebase console)
+ *  - avatar:   an emoji, or '' to show the first letter of the name
  */
 export const DEFAULT_MEMBERS = [
-  { id: 'dad',  name: 'אבא',  avatar: '👨', color: '#6366F1', isAdmin: true  },
-  { id: 'mom',  name: 'אמא',  avatar: '👩', color: '#EC4899', isAdmin: true  },
-  { id: 'noa',  name: 'נועה', avatar: '👧', color: '#F59E0B', isAdmin: false },
-  { id: 'itay', name: 'איתי', avatar: '👦', color: '#10B981', isAdmin: false },
-  { id: 'maya', name: 'מאיה', avatar: '🧒', color: '#0EA5E9', isAdmin: false },
+  { id: 'dad',   name: 'אבא',  avatar: '👨', color: '#6366F1', isAdmin: true, canScore: true },
+  { id: 'mom',   name: 'אמא',  avatar: '👩', color: '#EC4899', isAdmin: true },
+  { id: 'gilad', name: 'גלעד', avatar: '',   color: '#0EA5E9' },
+  { id: 'ori',   name: 'אורי', avatar: '',   color: '#10B981' },
+  { id: 'roni',  name: 'רוני', avatar: '',   color: '#F59E0B' },
+  { id: 'noam',  name: 'נועם', avatar: '',   color: '#8B5CF6' },
+  { id: 'yael',  name: 'יעל',  avatar: '',   color: '#EF4444' },
 ];
 
 /** Cars. If you add a car, also add its id to the list in firestore.rules. `icon` = Lucide icon name. */
