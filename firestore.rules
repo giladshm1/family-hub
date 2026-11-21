@@ -10,10 +10,10 @@ service cloud.firestore {
     function isOwner() { return signedIn() && exists(ownerPath()) && get(ownerPath()).data.uid == request.auth.uid; }
     function isLinked() { return signedIn() && exists(linkPath()); }
     function myMemberId() { return get(linkPath()).data.memberId; }
-    function isAdmin() {
-      return isOwner() || (isLinked()
-        && get(/databases/$(database)/documents/members/$(myMemberId())).data.isAdmin == true);
-    }
+    function myMember() { return get(/databases/$(database)/documents/members/$(myMemberId())).data; }
+    function isAdmin() { return isOwner() || (isLinked() && myMember().isAdmin == true); }
+    function canScore() { return isLinked() && myMember().get('canScore', false) == true; }
+    function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
     // First person to set up the app becomes the owner (always an admin).
     match /meta/owner {
@@ -22,10 +22,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Family members + dishwashing scores: everyone in the family reads, only admins write.
+    // Family members + dishwashing scores: everyone in the family reads.
+    // Only members with canScore (dad) may change scores; admins edit everything else.
+    // Nobody can grant canScore from the app — only from the Firebase console.
     match /members/{memberId} {
       allow read: if isLinked() || isOwner();
-      allow create, update: if isAdmin() && request.resource.data.get('score', 0) >= 0;
+      allow create: if isAdmin() && request.resource.data.get('score', 0) == 0;
+      allow update: if (canScore() && changed().hasOnly(['score']) && request.resource.data.score >= 0)
+                    || (isAdmin() && !changed().hasAny(['score', 'canScore']));
       allow delete: if isAdmin();
     }
 
