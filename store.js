@@ -13,6 +13,7 @@ export const Store = {
     link: null,  linkLoaded: false,   // { memberId } for the signed-in account
     members: [], membersLoaded: false,
     reservations: [],
+    shopping: [],         // shared shopping list items
     pending: [],          // admin only
     links: [],            // admin only
     activeTab: savedTab || 'overview',
