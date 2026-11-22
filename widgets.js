@@ -19,7 +19,7 @@
  *   (data.js + firestore.rules) and is exposed through Store.state.
  * ===================================================================== */
 
-import { CARS, NOTE_PRESETS, MEMBER_COLORS } from './config.js';
+import { CARS, NOTE_PRESETS, MEMBER_COLORS, SHOPPING_SUGGESTIONS } from './config.js';
 import { Store } from './store.js';
 import { Data } from './data.js';
 import { Utils, avatarHtml, icon, renderIcons, Toast, Modal } from './ui.js';
@@ -466,7 +466,122 @@ const CarsWidget = {
 };
 
 /* ---------------------------------------------------------------------
- * 3. Family management (admins only)
+ * 3. Shared shopping list — everyone adds, anyone checks off at the store
+ * --------------------------------------------------------------------- */
+
+const ShoppingWidget = {
+  id: 'shopping',
+  title: 'רשימת קניות',
+  subtitle: 'כולם מוסיפים, מסמנים בסופר',
+  icon: 'shopping-cart',
+  accent: '#10B981',
+  span: 'lg:col-span-3',
+  draft: { text: '', qty: '' },
+
+  open: (state) => state.shopping.filter((i) => !i.done).sort((a, b) => a.createdAt - b.createdAt),
+  bought: (state) => state.shopping.filter((i) => i.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0)),
+
+  headerExtra({ state }) {
+    return `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 px-3 py-1 text-xs font-bold">${icon('list-checks', 'w-3.5 h-3.5')} ${this.open(state).length} לקנות</span>`;
+  },
+
+  /** Overview: just what's missing, no editing. */
+  renderOverview({ state }) {
+    const items = this.open(state);
+    const chips = items.slice(0, 12).map((i) =>
+      `<span class="inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-3 py-1.5 text-sm text-slate-700"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>${Utils.esc(i.text)}${i.qty ? ` <span class="text-slate-400">· ${Utils.esc(i.qty)}</span>` : ''}</span>`).join('');
+    const more = items.length > 12 ? `<span class="self-center text-sm text-slate-400">ועוד ${items.length - 12}…</span>` : '';
+    return `
+      <div class="flex flex-wrap gap-2">${chips || '<span class="text-sm text-slate-400">הרשימה ריקה 🎉</span>'}${more}</div>
+      <button class="btn-ghost !rounded-2xl mt-4" data-action="nav:tab" data-tab="shopping">${icon('shopping-cart', 'w-4 h-4')} לרשימה המלאה ולסימון בסופר</button>`;
+  },
+
+  renderRow(i) {
+    const who = Store.memberById(i.addedBy);
+    const buyer = i.doneBy && Store.memberById(i.doneBy);
+    return `
+      <li class="flex items-center gap-3 rounded-2xl border px-3 py-2.5 transition ${i.done ? 'border-transparent bg-slate-50' : 'border-slate-100 bg-white hover:shadow-soft'}">
+        <button class="w-8 h-8 shrink-0 rounded-full border-2 flex items-center justify-center transition active:scale-90 ${i.done ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 text-transparent hover:border-emerald-400 hover:text-emerald-300'}" data-action="shop:toggle" data-id="${i.id}" aria-label="${i.done ? 'סימון כלא נקנה' : 'סימון כנקנה'}">${icon('check', 'w-4 h-4')}</button>
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold truncate ${i.done ? 'text-slate-400 line-through' : 'text-slate-800'}">${Utils.esc(i.text)}${i.qty ? ` <span class="font-normal text-slate-400">· ${Utils.esc(i.qty)}</span>` : ''}</div>
+          <div class="mt-0.5 flex items-center gap-1.5 text-xs text-slate-400">${i.done ? `נקנה${buyer ? ` ע״י ${Utils.esc(buyer.name)}` : ''}` : `${avatarHtml(who, 'xs')} ${Utils.esc(who ? who.name : '')}`}</div>
+        </div>
+        <button class="w-8 h-8 shrink-0 rounded-xl flex items-center justify-center text-slate-300 transition hover:bg-rose-50 hover:text-rose-600" data-action="shop:delete" data-id="${i.id}" title="הסרה מהרשימה" aria-label="הסרה מהרשימה">${icon('x', 'w-4 h-4')}</button>
+      </li>`;
+  },
+
+  render({ state }) {
+    const open = this.open(state);
+    const bought = this.bought(state);
+    const d = this.draft;
+    const onList = new Set(open.map((i) => i.text.trim()));
+    const suggestions = SHOPPING_SUGGESTIONS.filter((s) => !onList.has(s))
+      .map((s) => `<button type="button" class="chip" data-action="shop:quick" data-text="${Utils.esc(s)}">${icon('plus', 'w-3 h-3')} ${Utils.esc(s)}</button>`).join('');
+    return `
+      <form data-submit="shop:add" class="flex gap-2">
+        <input id="shop-text" name="text" class="field flex-1" maxlength="60" placeholder="מה צריך לקנות?" value="${Utils.esc(d.text)}" data-input="shop:field" autocomplete="off" />
+        <input id="shop-qty" name="qty" class="field !w-24 text-center" maxlength="20" placeholder="כמות" value="${Utils.esc(d.qty)}" data-input="shop:field" autocomplete="off" />
+        <button type="submit" class="btn-primary !px-4 shrink-0" aria-label="הוספה">${icon('plus', 'w-5 h-5')}<span class="hidden sm:inline">הוספה</span></button>
+      </form>
+      ${suggestions ? `<div class="mt-3 flex flex-wrap gap-1.5">${suggestions}</div>` : ''}
+      <div class="mt-6 grid md:grid-cols-2 gap-6">
+        <div>
+          <h3 class="mb-3 flex items-center gap-2 font-bold text-slate-800">${icon('shopping-basket', 'w-5 h-5 text-emerald-500')} צריך לקנות
+            <span class="rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-0.5">${open.length}</span></h3>
+          ${open.length ? `<ul class="space-y-2">${open.map((i) => this.renderRow(i)).join('')}</ul>`
+            : `<div class="rounded-2xl bg-slate-50 py-8 text-center text-slate-400">${icon('party-popper', 'w-7 h-7 mx-auto mb-2')}<div class="font-semibold">הכל נקנה!</div></div>`}
+        </div>
+        <div>
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <h3 class="flex items-center gap-2 font-bold text-slate-800">${icon('circle-check', 'w-5 h-5 text-slate-400')} נקנה
+              <span class="rounded-full bg-slate-100 text-slate-500 text-xs font-bold px-2 py-0.5">${bought.length}</span></h3>
+            ${bought.length ? `<button class="chip" data-action="shop:clear">${icon('trash-2', 'w-3.5 h-3.5')} ניקוי הנקנים</button>` : ''}
+          </div>
+          ${bought.length ? `<ul class="space-y-2">${bought.map((i) => this.renderRow(i)).join('')}</ul>`
+            : '<p class="text-sm text-slate-400">עוד לא סומן כלום. בסופר, לוחצים על העיגול ליד מה שנכנס לעגלה.</p>'}
+        </div>
+      </div>`;
+  },
+
+  async add(text, qty) {
+    text = String(text || '').trim();
+    if (!text) return Toast.show('נא לכתוב מה לקנות', 'error');
+    if (this.open(Store.state).some((i) => i.text.trim() === text)) return Toast.show(`${text} כבר ברשימה`, 'info');
+    await Data.addShoppingItem({
+      text, qty: String(qty || '').trim(), addedBy: Store.me().id, uid: Store.state.authUser.uid,
+      done: false, createdAt: Date.now(),
+    });
+    this.draft = { text: '', qty: '' };
+    rerender();
+  },
+
+  actions: {
+    'shop:field'(el) { ShoppingWidget.draft[el.name] = el.value; },
+    async 'shop:add'(form) {
+      const fd = new FormData(form);
+      await ShoppingWidget.add(fd.get('text'), fd.get('qty'));
+      setTimeout(() => document.getElementById('shop-text')?.focus(), 50); // keep adding
+    },
+    async 'shop:quick'(el) { await ShoppingWidget.add(el.dataset.text, ''); },
+    async 'shop:toggle'(el) {
+      const item = Store.state.shopping.find((x) => x.id === el.dataset.id);
+      if (item) await Data.setShoppingDone(item.id, !item.done, Store.me().id);
+    },
+    async 'shop:delete'(el) { await Data.deleteShoppingItem(el.dataset.id); },
+    'shop:clear'() {
+      const ids = ShoppingWidget.bought(Store.state).map((i) => i.id);
+      Modal.open({
+        title: 'לנקות את מה שנקנה?', iconName: 'trash-2', tone: 'rose',
+        body: `${ids.length} פריטים שסומנו כנקנו יימחקו מהרשימה.`,
+        confirmText: 'ניקוי', cancelText: 'ביטול',
+        onConfirm: async () => { await Data.clearShopping(ids); Toast.show('הרשימה נוקתה', 'info'); },
+      });
+    },
+  },
+};
+
+/* ---------------------------------------------------------------------
+ * 4. Family management (admins only)
  * --------------------------------------------------------------------- */
 
 function memberFormHtml(m = {}) {
@@ -645,5 +760,5 @@ const FamilyWidget = {
 /* ---------------------------------------------------------------------
  * Registry — order = order in the overview & tabs
  * --------------------------------------------------------------------- */
-export const WIDGETS = [LeaderboardWidget, CarsWidget, FamilyWidget];
+export const WIDGETS = [LeaderboardWidget, CarsWidget, ShoppingWidget, FamilyWidget];
 export { CarsWidget };
