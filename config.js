@@ -38,8 +38,8 @@ export const DEFAULT_MEMBERS = [
 
 /** Cars. If you add a car, also add its id to the list in firestore.rules. `icon` = Lucide icon name. */
 export const CARS = [
-  { id: 'car1', name: 'רכב 1 - סיטרואן',  short: 'סיסי',  description: '', icon: 'car',       color: '#6366F1' },
-  { id: 'car2', name: 'רכב 2 - יונדאי', short: 'קוני', description: '',     icon: 'car-front', color: '#14B8A6' },
+  { id: 'car1', name: 'סיטרואן',  short: 'סיסי',  description: '', icon: 'car',       color: '#6366F1' },
+  { id: 'car2', name: 'יונדאי', short: 'קוני', description: '',     icon: 'car-front', color: '#14B8A6' },
 ];
 
 /** Quick-pick notes under the booking form. */
