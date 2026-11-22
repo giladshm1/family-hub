@@ -9,6 +9,8 @@
  *     accent: '#8B5CF6',
  *     span: 'lg:col-span-1',    // width in the 3-column overview grid
  *     visible(ctx) { return true; },   // optional (e.g. admins only)
+ *     inOverview: false,               // optional: hide from the overview tab
+ *     renderOverview(ctx) { ... },     // optional: shorter version for the overview tab
  *     headerExtra(ctx) { ... },        // optional HTML at the header's left
  *     render(ctx) { return '...'; },   // ctx = { state, me, isAdmin }
  *     actions: { 'my:action'(el, event) { ... } },
@@ -38,7 +40,7 @@ const MEDALS = [
 
 const LeaderboardWidget = {
   id: 'dishes',
-  title: 'אלופי הכלים',
+  title: 'ניקוד שטיפת כלים',
   subtitle: 'טבלת שטיפת הכלים המשפחתית',
   icon: 'utensils',
   accent: '#F59E0B',
@@ -189,6 +191,13 @@ const CarsWidget = {
 
   headerExtra() {
     return `<span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 text-slate-600 px-3 py-1 text-xs font-bold tabular-nums">${icon('clock', 'w-3.5 h-3.5')} <span data-live-clock>${Utils.fmtTime(Date.now())}</span></span>`;
+  },
+
+  /** Overview: live status only — booking happens in the cars tab. */
+  renderOverview() {
+    return `
+      <div id="car-status" class="grid sm:grid-cols-2 gap-4">${this.renderStatus()}</div>
+      <button class="btn-primary w-full mt-5" data-action="nav:tab" data-tab="cars">${icon('calendar-plus', 'w-5 h-5')} לשריון רכב והזמנות קרובות</button>`;
   },
 
   render(ctx) {
@@ -486,6 +495,7 @@ const FamilyWidget = {
   accent: '#8B5CF6',
   span: 'lg:col-span-3',
   visible: ({ isAdmin }) => isAdmin,
+  inOverview: false,
 
   headerExtra({ state }) {
     return state.pending.length
