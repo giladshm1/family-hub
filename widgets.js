@@ -144,6 +144,8 @@ const CarsWidget = {
 
   draft: null,     // booking form values (kept across re-renders)
   filter: 'all',   // list filter: 'all' | car id
+  calMonth: null,  // calendar: first day of the shown month (ms)
+  calSelected: null, // calendar: selected day 'YYYY-MM-DD'
 
   car: (id) => CARS.find((c) => c.id === id),
 
@@ -207,6 +209,85 @@ const CarsWidget = {
       <div class="mt-6 grid md:grid-cols-2 gap-5">
         ${this.renderForm()}
         ${this.renderList(ctx)}
+      </div>
+      ${this.renderCalendar()}`;
+  },
+
+  /** Bookings (all cars) that overlap a given local day. */
+  bookingsOn(dayKey) {
+    const [y, m, d] = dayKey.split('-').map(Number);
+    const start = new Date(y, m - 1, d).getTime();
+    const end = new Date(y, m - 1, d + 1).getTime();
+    return Store.state.reservations.filter((r) => r.start < end && r.end > start).sort((a, b) => a.start - b.start);
+  },
+
+  /** Month calendar (Sunday first, RTL) + the selected day's bookings. */
+  renderCalendar() {
+    const now = new Date();
+    const todayKey = Utils.toDateInput(now);
+    if (!this.calMonth) this.calMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+    if (!this.calSelected) this.calSelected = todayKey;
+    const month = new Date(this.calMonth);
+    const y = month.getFullYear(), mo = month.getMonth();
+    const offset = new Date(y, mo, 1).getDay();                     // 0 = Sunday
+    const cellsCount = Math.ceil((offset + new Date(y, mo + 1, 0).getDate()) / 7) * 7;
+    const carOf = (r) => this.car(r.carId) || { color: '#94A3B8', short: '?' };
+
+    const cells = Array.from({ length: cellsCount }, (_, i) => {
+      const d = new Date(y, mo, 1 - offset + i);
+      const key = Utils.toDateInput(d);
+      const list = this.bookingsOn(key);
+      const inMonth = d.getMonth() === mo;
+      const isToday = key === todayKey;
+      const selected = key === this.calSelected;
+      const past = key < todayKey;
+      const bars = list.slice(0, 2).map((r) => {
+        const who = Store.memberById(r.memberId);
+        return `<span class="truncate rounded-md px-1 py-0.5 text-[10px] font-semibold text-white" style="background:${carOf(r).color}">${Utils.fmtTime(r.start)} ${Utils.esc(who ? who.name : '')}</span>`;
+      }).join('');
+      const dots = list.slice(0, 4).map((r) => `<span class="w-1.5 h-1.5 rounded-full" style="background:${carOf(r).color}"></span>`).join('');
+      return `
+        <button type="button" data-action="cal:day" data-date="${key}"
+          class="min-h-[3.25rem] sm:min-h-[5.75rem] min-w-0 rounded-xl sm:rounded-2xl border p-1 sm:p-1.5 flex flex-col items-stretch gap-1 text-right transition
+                 ${selected ? 'border-indigo-400 ring-2 ring-indigo-100 bg-indigo-50/50' : 'border-slate-100 bg-white hover:border-slate-300'} ${inMonth ? '' : 'opacity-40'}">
+          <span class="self-start text-xs sm:text-sm font-bold ${isToday ? 'w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center' : past ? 'text-slate-400' : 'text-slate-700'}">${d.getDate()}</span>
+          <span class="hidden sm:flex flex-col gap-0.5 min-w-0">${bars}${list.length > 2 ? `<span class="text-[10px] font-semibold text-slate-400">+${list.length - 2} נוספות</span>` : ''}</span>
+          <span class="flex sm:hidden flex-wrap gap-0.5">${dots}</span>
+        </button>`;
+    }).join('');
+
+    const weekdays = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'ש׳']
+      .map((w) => `<div class="text-center text-xs font-bold text-slate-400 py-1">${w}</div>`).join('');
+    const legend = CARS.map((c) => `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500"><span class="w-2.5 h-2.5 rounded-full" style="background:${c.color}"></span>${Utils.esc(c.short)}</span>`).join('');
+
+    // Selected day details
+    const selList = this.bookingsOn(this.calSelected);
+    const selStart = Utils.parseLocal(this.calSelected, '00:00');
+    const selPast = this.calSelected < todayKey;
+    const dayTitle = `${Utils.dayLabel(selStart)}${['היום', 'מחר', 'אתמול'].includes(Utils.dayLabel(selStart)) ? ` · ${new Date(selStart).toLocaleDateString('he-IL', { day: 'numeric', month: 'long' })}` : ''}`;
+
+    return `
+      <div class="mt-6 rounded-3xl border border-slate-100 bg-white p-4 sm:p-5">
+        <div class="flex items-center justify-between gap-2 flex-wrap mb-4">
+          <h3 class="flex items-center gap-2 font-bold text-slate-800">${icon('calendar-days', 'w-5 h-5 text-indigo-500')} לוח שנה</h3>
+          <div class="flex items-center gap-1.5">
+            <button class="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600" data-action="cal:prev" aria-label="החודש הקודם">${icon('chevron-right', 'w-5 h-5')}</button>
+            <span class="min-w-[8.5rem] text-center font-bold text-slate-800">${Utils.esc(month.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' }))}</span>
+            <button class="w-9 h-9 rounded-xl flex items-center justify-center bg-slate-50 hover:bg-slate-100 text-slate-600" data-action="cal:next" aria-label="החודש הבא">${icon('chevron-left', 'w-5 h-5')}</button>
+            <button class="chip" data-action="cal:today">היום</button>
+          </div>
+        </div>
+        <div class="grid grid-cols-7 gap-1 sm:gap-1.5">${weekdays}${cells}</div>
+        <div class="mt-3 flex flex-wrap gap-4">${legend}</div>
+
+        <div class="mt-5 border-t border-slate-100 pt-4">
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-3">
+            <h4 class="font-bold text-slate-800">${Utils.esc(dayTitle)}</h4>
+            ${selPast ? '' : `<button class="chip chip-active" data-action="cal:book">${icon('calendar-plus', 'w-3.5 h-3.5')} שריון ביום הזה</button>`}
+          </div>
+          ${selList.length ? `<div class="space-y-2">${selList.map((r) => this.renderItem(r, Date.now())).join('')}</div>`
+            : '<p class="text-sm text-slate-400">אין הזמנות ביום הזה — שני הרכבים פנויים.</p>'}
+        </div>
       </div>`;
   },
 
@@ -411,6 +492,23 @@ const CarsWidget = {
     },
     'booking:field'(el) { CarsWidget.draft[el.name] = el.value; CarsWidget.refreshCheck(); },
     'booking:filter'(el) { CarsWidget.filter = el.dataset.filter; rerender(); },
+
+    // ---- calendar ----
+    'cal:prev'() { const m = new Date(CarsWidget.calMonth); CarsWidget.calMonth = new Date(m.getFullYear(), m.getMonth() - 1, 1).getTime(); rerender(); },
+    'cal:next'() { const m = new Date(CarsWidget.calMonth); CarsWidget.calMonth = new Date(m.getFullYear(), m.getMonth() + 1, 1).getTime(); rerender(); },
+    'cal:today'() { CarsWidget.calMonth = null; CarsWidget.calSelected = null; rerender(); },
+    'cal:day'(el) {
+      const key = el.dataset.date;
+      const [y, m] = key.split('-').map(Number);
+      CarsWidget.calSelected = key;
+      CarsWidget.calMonth = new Date(y, m - 1, 1).getTime();
+      rerender();
+    },
+    'cal:book'() {
+      CarsWidget.draft.date = CarsWidget.calSelected;
+      rerender();
+      setTimeout(() => document.getElementById('bk-start')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60);
+    },
 
     async 'booking:submit'(form) {
       const self = CarsWidget;
