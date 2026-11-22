@@ -62,6 +62,17 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isLinked() && resource.data.memberId == myMemberId());
     }
 
+    // Where each car is parked: any family member updates it (as themselves).
+    match /parking/{carId} {
+      allow read: if isLinked();
+      allow create, update: if isLinked()
+        && carId in ['car1', 'car2']
+        && request.resource.data.keys().hasOnly(['text', 'lat', 'lng', 'by', 'uid', 'at'])
+        && request.resource.data.by == myMemberId()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string && request.resource.data.text.size() <= 80;
+    }
+
     // Shared shopping list: anyone in the family adds (as themselves), checks off, and removes.
     match /shopping/{id} {
       allow read: if isLinked();
