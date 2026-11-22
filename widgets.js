@@ -24,6 +24,17 @@ import { Store } from './store.js';
 import { Data } from './data.js';
 import { Utils, avatarHtml, icon, renderIcons, Toast, Modal } from './ui.js';
 
+/** "עכשיו" / "לפני 5 דק׳" / "לפני 3 ש׳" / "לפני 2 ימים" */
+function timeAgo(ms) {
+  const mins = Math.round((Date.now() - ms) / 60000);
+  if (mins < 1) return 'עכשיו';
+  if (mins < 60) return `לפני ${mins} דק׳`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `לפני ${hours} ש׳`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? 'אתמול' : `לפני ${days} ימים`;
+}
+
 // Re-render hook, injected by app.js
 let rerender = () => {};
 export const setRerender = (fn) => { rerender = fn; };
@@ -322,8 +333,38 @@ const CarsWidget = {
           </div>
           <div class="relative mt-4">${badge}</div>
           <div class="relative mt-3 flex items-center gap-1.5 text-xs text-slate-500">${icon('calendar-clock', 'w-4 h-4 shrink-0')} ${nextLine}</div>
+          ${this.renderParking(car, now)}
         </div>`;
     }).join('');
+  },
+
+  /** Where the car is parked + update button (highlighted for whoever just used it). */
+  renderParking(car, now) {
+    const p = Store.state.parking[car.id];
+    const me = Store.me();
+    // Nudge: I'm using this car now, or returned it in the last 6 hours, and haven't updated since.
+    const mine = me && Store.state.reservations.find((r) => r.carId === car.id && r.memberId === me.id
+      && r.start <= now && r.end > now - 6 * 3600e3 && (!p || p.at < r.start));
+    const who = p && Store.memberById(p.by);
+    const nav = p && typeof p.lat === 'number'
+      ? `<div class="mt-2 flex flex-wrap gap-1.5">
+           <a class="chip" href="https://waze.com/ul?ll=${p.lat},${p.lng}&navigate=yes" target="_blank" rel="noopener">${icon('navigation', 'w-3.5 h-3.5')} Waze</a>
+           <a class="chip" href="https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}" target="_blank" rel="noopener">${icon('map', 'w-3.5 h-3.5')} מפה</a>
+         </div>`
+      : '';
+    const info = p
+      ? `<div class="flex items-start gap-2">
+           ${icon('map-pin', 'w-4 h-4 mt-0.5 text-rose-500 shrink-0')}
+           <div class="flex-1 min-w-0">
+             <div class="text-sm font-semibold text-slate-800 break-words">${Utils.esc(p.text || 'מיקום שמור במפה')}</div>
+             <div class="text-xs text-slate-400">${Utils.esc(who ? who.name : '')} · ${timeAgo(p.at)}</div>
+           </div>
+         </div>${nav}`
+      : `<div class="flex items-center gap-2 text-xs text-slate-400">${icon('map-pin', 'w-4 h-4 shrink-0')} עוד לא עודכן איפה הרכב חונה</div>`;
+    const button = mine
+      ? `<button class="btn-primary w-full mt-3 !py-2.5 text-sm" data-action="park:open" data-car="${car.id}">${icon('map-pin', 'w-4 h-4')} החזרת את ${Utils.esc(car.short)}? איפה חנית?</button>`
+      : `<button class="chip mt-3" data-action="park:open" data-car="${car.id}">${icon('map-pin', 'w-3.5 h-3.5')} עדכון חניה</button>`;
+    return `<div class="relative mt-3 rounded-2xl bg-white/80 border border-slate-100 p-3">${info}${button}</div>`;
   },
 
   renderForm() {
@@ -492,6 +533,50 @@ const CarsWidget = {
     },
     'booking:field'(el) { CarsWidget.draft[el.name] = el.value; CarsWidget.refreshCheck(); },
     'booking:filter'(el) { CarsWidget.filter = el.dataset.filter; rerender(); },
+
+    // ---- parking ----
+    'park:open'(el) {
+      const car = CarsWidget.car(el.dataset.car);
+      if (!car) return;
+      const prev = Store.state.parking[car.id];
+      Modal.open({
+        title: `איפה ${car.short} חונה?`, iconName: 'map-pin', confirmText: 'שמירה', cancelText: 'ביטול',
+        body: `
+          <div class="space-y-3 text-right">
+            <div>
+              <label class="label" for="pk-text">תיאור המקום</label>
+              <input id="pk-text" class="field" maxlength="80" placeholder="לדוגמה: חניון הבניין, קומה ‎-2, ליד המעלית" value="${Utils.esc(prev?.text || '')}" />
+            </div>
+            <button type="button" class="btn-ghost w-full !rounded-2xl" data-action="park:locate">${icon('locate-fixed', 'w-4 h-4')} <span id="pk-loc">צירוף המיקום הנוכחי שלי (למפה ול-Waze)</span></button>
+            <input type="hidden" id="pk-lat" /><input type="hidden" id="pk-lng" />
+          </div>`,
+        onConfirm: async (panel) => {
+          const text = panel.querySelector('#pk-text').value.trim();
+          const lat = parseFloat(panel.querySelector('#pk-lat').value);
+          const lng = parseFloat(panel.querySelector('#pk-lng').value);
+          if (!text && Number.isNaN(lat)) { Toast.show('נא לכתוב איפה חנית או לצרף מיקום', 'error'); return false; }
+          const data = { text, by: Store.me().id, uid: Store.state.authUser.uid, at: Date.now() };
+          if (!Number.isNaN(lat) && !Number.isNaN(lng)) Object.assign(data, { lat, lng });
+          await Data.setParking(car.id, data);
+          Toast.show(`החניה של ${car.short} עודכנה`);
+        },
+      });
+    },
+    'park:locate'(el) {
+      const label = document.getElementById('pk-loc');
+      if (!navigator.geolocation) { label.textContent = 'המכשיר לא תומך במיקום'; return; }
+      label.textContent = 'מאתר מיקום…';
+      el.disabled = true;
+      navigator.geolocation.getCurrentPosition((pos) => {
+        document.getElementById('pk-lat').value = pos.coords.latitude.toFixed(6);
+        document.getElementById('pk-lng').value = pos.coords.longitude.toFixed(6);
+        label.textContent = `✓ המיקום צורף (דיוק ±${Math.round(pos.coords.accuracy)} מ׳)`;
+        el.disabled = false;
+      }, () => {
+        label.textContent = 'לא הצלחתי לאתר מיקום — אפשר לכתוב תיאור';
+        el.disabled = false;
+      }, { enableHighAccuracy: true, timeout: 15000 });
+    },
 
     // ---- calendar ----
     'cal:prev'() { const m = new Date(CarsWidget.calMonth); CarsWidget.calMonth = new Date(m.getFullYear(), m.getMonth() - 1, 1).getTime(); rerender(); },
