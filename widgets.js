@@ -23,6 +23,7 @@ import { CARS, NOTE_PRESETS, MEMBER_COLORS, SHOPPING_SUGGESTIONS } from './confi
 import { Store } from './store.js';
 import { Data } from './data.js';
 import { Utils, avatarHtml, icon, renderIcons, Toast, Modal } from './ui.js';
+import { EventsWidget, setRerender as setEventsRerender } from './events.js';
 
 /** "עכשיו" / "לפני 5 דק׳" / "לפני 3 ש׳" / "לפני 2 ימים" */
 function timeAgo(ms) {
@@ -37,7 +38,7 @@ function timeAgo(ms) {
 
 // Re-render hook, injected by app.js
 let rerender = () => {};
-export const setRerender = (fn) => { rerender = fn; };
+export const setRerender = (fn) => { rerender = fn; setEventsRerender(fn); };
 
 /* ---------------------------------------------------------------------
  * 1. Dishwashing leaderboard
@@ -943,5 +944,5 @@ const FamilyWidget = {
 /* ---------------------------------------------------------------------
  * Registry — order = order in the overview & tabs
  * --------------------------------------------------------------------- */
-export const WIDGETS = [LeaderboardWidget, CarsWidget, ShoppingWidget, FamilyWidget];
+export const WIDGETS = [LeaderboardWidget, CarsWidget, EventsWidget, ShoppingWidget, FamilyWidget];
 export { CarsWidget };
