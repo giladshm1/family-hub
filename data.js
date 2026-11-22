@@ -8,6 +8,7 @@
  *   links/{uid}         { memberId, email, name }    Google account -> family member
  *   pending/{uid}       { email, name, photoURL, at } sign-ins waiting for an admin
  *   reservations/{id}   { carId, memberId, uid, start, end, note, createdAt }
+ *   shopping/{id}       { text, qty, addedBy, uid, done, doneBy, doneAt, createdAt }
  * Permissions are enforced server-side in firestore.rules.
  * ===================================================================== */
 
@@ -109,4 +110,16 @@ export const Data = {
   // ---------- Reservations ----------
   addReservation: (r) => addDoc(collection(db, 'reservations'), r),
   cancelReservation: (id) => deleteDoc(doc(db, 'reservations', id)),
+
+  // ---------- Shopping list ----------
+  watchShopping: (cb) => onSnapshot(collection(db, 'shopping'), (s) => cb(docsOf(s)), onErr('shopping')),
+  addShoppingItem: (item) => addDoc(collection(db, 'shopping'), item),
+  setShoppingDone: (id, done, memberId) => updateDoc(doc(db, 'shopping', id),
+    { done, doneBy: done ? memberId : null, doneAt: done ? Date.now() : null }),
+  deleteShoppingItem: (id) => deleteDoc(doc(db, 'shopping', id)),
+  async clearShopping(ids) {
+    const batch = writeBatch(db);
+    ids.forEach((id) => batch.delete(doc(db, 'shopping', id)));
+    await batch.commit();
+  },
 };
