@@ -15,6 +15,7 @@ export const Store = {
     reservations: [],
     shopping: [],         // shared shopping list items
     parking: {},          // { [carId]: { text, lat, lng, by, at } }
+    events: [],           // family events
     pending: [],          // admin only
     links: [],            // admin only
     activeTab: savedTab || 'overview',
