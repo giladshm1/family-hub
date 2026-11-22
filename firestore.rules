@@ -73,6 +73,29 @@ service cloud.firestore {
         && request.resource.data.text is string && request.resource.data.text.size() <= 80;
     }
 
+    // Family events: anyone adds; creator or admin edits/deletes; everyone answers only for themselves.
+    match /events/{id} {
+      allow read: if isLinked();
+      allow create: if isLinked()
+        && request.resource.data.keys().hasOnly(['title', 'date', 'time', 'location', 'notes', 'createdBy', 'uid', 'createdAt', 'rsvp'])
+        && request.resource.data.createdBy == myMemberId()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 60
+        && request.resource.data.date is string && request.resource.data.date.size() == 10
+        && request.resource.data.get('notes', '').size() <= 300
+        && request.resource.data.rsvp is map;
+      allow update: if isLinked() && (
+        (changed().hasOnly(['rsvp'])
+          && request.resource.data.rsvp.diff(resource.data.rsvp).affectedKeys().hasOnly([myMemberId()]))
+        || ((resource.data.createdBy == myMemberId() || isAdmin())
+          && !changed().hasAny(['createdBy', 'uid', 'createdAt'])
+          && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 60
+          && request.resource.data.get('notes', '').size() <= 300)
+      );
+      allow delete: if isLinked() && (resource.data.createdBy == myMemberId() || isAdmin());
+    }
+
     // Shared shopping list: anyone in the family adds (as themselves), checks off, and removes.
     match /shopping/{id} {
       allow read: if isLinked();
