@@ -28,6 +28,7 @@ function syncSubscriptions() {
   ensureSub('members', linked || (!!uid && Store.isOwner()), () =>
     Data.watchMembers((members) => Store.set({ members, membersLoaded: true })));
   ensureSub('reservations', linked, () => Data.watchReservations((reservations) => Store.set({ reservations })));
+  ensureSub('shopping', linked, () => Data.watchShopping((shopping) => Store.set({ shopping })));
   const admin = linked && s.membersLoaded && Store.isAdmin();
   ensureSub('pending', admin, () => Data.watchPending((pending) => Store.set({ pending })));
   ensureSub('links', admin, () => Data.watchLinks((links) => Store.set({ links })));
@@ -274,7 +275,7 @@ Data.onAuth((user) => {
   Store.set({
     authReady: true, authUser: user,
     owner: null, ownerLoaded: false, link: null, linkLoaded: false,
-    members: [], membersLoaded: false, reservations: [], pending: [], links: [],
+    members: [], membersLoaded: false, reservations: [], shopping: [], pending: [], links: [],
   });
 });
 
