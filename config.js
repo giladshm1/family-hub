@@ -45,5 +45,8 @@ export const CARS = [
 /** Quick-pick notes under the booking form. */
 export const NOTE_PRESETS = ['דייט' ,'אימון', 'סידורים', 'עבודה', 'קניות', 'חוג', 'בילוי'];
 
+/** Quick-add chips under the shopping list input. */
+export const SHOPPING_SUGGESTIONS = ['חלב', 'לחם', 'ביצים', 'גבינה', 'עגבניות', 'מלפפונים', 'בננות', 'קפה', 'נייר טואלט'];
+
 /** Colors offered when adding a family member. */
 export const MEMBER_COLORS = ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#0EA5E9', '#8B5CF6', '#EF4444', '#14B8A6'];
