@@ -2,11 +2,12 @@
  * app.js — app shell: screens, header, tabs, live subscriptions, boot
  * ===================================================================== */
 
-import { APP_CONFIG, DEFAULT_MEMBERS } from './config.js';
+import { APP_CONFIG, DEFAULT_MEMBERS, CARS } from './config.js';
 import { Store } from './store.js';
 import { Data } from './data.js';
 import { Utils, avatarHtml, icon, renderIcons, Actions, Toast, Modal, friendlyError } from './ui.js';
 import { WIDGETS, CarsWidget, setRerender } from './widgets.js';
+import { PWA, Notify } from './pwa.js';
 
 /* ---------------------------------------------------------------------
  * Live subscriptions — started/stopped automatically based on state
@@ -27,7 +28,7 @@ function syncSubscriptions() {
   const linked = !!uid && !!s.link;
   ensureSub('members', linked || (!!uid && Store.isOwner()), () =>
     Data.watchMembers((members) => Store.set({ members, membersLoaded: true })));
-  ensureSub('reservations', linked, () => Data.watchReservations((reservations) => Store.set({ reservations })));
+  ensureSub('reservations', linked, () => Data.watchReservations(onReservations));
   ensureSub('shopping', linked, () => Data.watchShopping((shopping) => Store.set({ shopping })));
   const admin = linked && s.membersLoaded && Store.isAdmin();
   ensureSub('pending', admin, () => Data.watchPending((pending) => Store.set({ pending })));
@@ -38,6 +39,31 @@ function syncSubscriptions() {
     accessRequestedFor = uid;
     Data.requestAccess(s.authUser).catch((err) => console.error('requestAccess', err));
   }
+}
+
+/* ---------------------------------------------------------------------
+ * New-booking alerts: when someone else books a car, everyone gets a
+ * pop-up (in-app toast if the app is open, system notification otherwise).
+ * --------------------------------------------------------------------- */
+let knownReservations = null; // ids already seen; null until the first load
+
+function onReservations(reservations) {
+  const myUid = Store.state.authUser?.uid;
+  if (knownReservations) {
+    reservations
+      .filter((r) => !knownReservations.has(r.id) && r.uid !== myUid && Date.now() - (r.createdAt || 0) < 10 * 60 * 1000)
+      .forEach((r) => Store.memberById(r.memberId) ? announceBooking(r) : setTimeout(() => announceBooking(r), 1500));
+  }
+  knownReservations = new Set(reservations.map((r) => r.id));
+  Store.set({ reservations });
+}
+
+function announceBooking(r) {
+  const who = Store.memberById(r.memberId)?.name || 'מישהו';
+  const car = CARS.find((c) => c.id === r.carId)?.short || 'רכב';
+  const body = `${who} שריין/ה את ${car} · ${Utils.dayLabel(r.start)} ${Utils.fmtTime(r.start)}–${Utils.fmtTime(r.end)}${r.note ? ` · ${r.note}` : ''}`;
+  if (document.visibilityState === 'visible') Toast.show(`🚗 ${body}`, 'info');
+  else Notify.show('שריון רכב חדש 🚗', body, `res-${r.id}`);
 }
 
 /* ---------------------------------------------------------------------
@@ -132,10 +158,42 @@ function renderHeader(me, isAdmin) {
               </div>
             </div>
           </div>
+          ${headerButtons()}
           <button class="btn-ghost" data-action="auth:signout" title="החלפת משתמש / התנתקות">${icon('repeat', 'w-4 h-4')}<span class="hidden sm:inline">החלפת משתמש</span></button>
         </div>
       </div>
     </header>`;
+}
+
+/** Install-app and notification buttons in the header. */
+function headerButtons() {
+  const ns = Notify.status();
+  const bellTitle = { on: 'התראות פעילות — לחיצה להשתקה', off: 'הפעלת התראות על שריון רכב', blocked: 'ההתראות חסומות בהגדרות הדפדפן' }[ns];
+  const bell = ns === 'unsupported' ? ''
+    : `<button class="btn-ghost !px-2.5 ${ns === 'on' ? '!text-indigo-600 !border-indigo-200' : ''}" data-action="notify:toggle" title="${bellTitle}" aria-label="${bellTitle}">${icon(ns === 'on' ? 'bell-ring' : 'bell-off', 'w-4 h-4')}</button>`;
+  const install = PWA.canInstall()
+    ? `<button class="btn-ghost !px-2.5 sm:!px-3.5" data-action="pwa:install" title="התקנה כאפליקציה">${icon('download', 'w-4 h-4')}<span class="hidden sm:inline">התקנה</span></button>`
+    : '';
+  return install + bell;
+}
+
+/** One-time invitation to turn on booking notifications on this device. */
+function notifyBanner() {
+  let dismissed = false;
+  try { dismissed = localStorage.getItem('familyHub.notifyAsked') === '1'; } catch {}
+  if (Notify.status() !== 'off' || dismissed) return '';
+  return `
+    <div class="anim-fade-up mb-6 flex flex-col sm:flex-row sm:items-center gap-3 rounded-3xl bg-indigo-50 border border-indigo-100 p-4">
+      <span class="w-11 h-11 rounded-2xl bg-white text-indigo-600 flex items-center justify-center shrink-0 shadow-sm">${icon('bell-ring', 'w-5 h-5')}</span>
+      <div class="flex-1 text-sm">
+        <div class="font-bold text-slate-800">לקבל התראה כשמישהו משריין רכב?</div>
+        <div class="text-slate-500">ההתראה תקפוץ במכשיר הזה.</div>
+      </div>
+      <div class="flex gap-2">
+        <button class="btn-primary !py-2.5" data-action="notify:toggle">הפעלה</button>
+        <button class="btn-ghost" data-action="notify:dismiss">לא עכשיו</button>
+      </div>
+    </div>`;
 }
 
 let lastView = null; // animate only when the view/tab changes
@@ -192,6 +250,7 @@ function renderDashboard() {
         </div>
         ${tabsHtml}
       </div>
+      ${notifyBanner()}
       ${content}
       <footer class="mt-10 flex items-center justify-center gap-1.5 text-xs text-slate-400">${icon('cloud', 'w-3.5 h-3.5')} מסונכרן בזמן אמת לכל המשפחה</footer>
     </main>`;
@@ -260,6 +319,23 @@ Actions.register('setup:pick', async (el) => {
   }
 });
 
+Actions.register('pwa:install', async () => {
+  if (await PWA.install()) Toast.show('האפליקציה הותקנה! 🎉');
+});
+
+Actions.register('notify:toggle', async () => {
+  const s = Notify.status();
+  if (s === 'on') { Notify.disable(); Toast.show('ההתראות הושתקו במכשיר הזה', 'info'); return; }
+  if (s === 'blocked') { Toast.show('ההתראות חסומות — אפשר לאשר אותן בהגדרות האתר בדפדפן', 'error'); return; }
+  const r = await Notify.enable();
+  Toast.show(r === 'on' ? 'מעולה! תקבלו התראה על כל שריון רכב' : 'ההתראות לא אושרו', r === 'on' ? 'success' : 'info');
+});
+
+Actions.register('notify:dismiss', () => {
+  try { localStorage.setItem('familyHub.notifyAsked', '1'); } catch {}
+  renderApp();
+});
+
 Actions.register('nav:tab', (el) => {
   Store.set({ activeTab: el.dataset.tab });
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -272,6 +348,7 @@ Store.subscribe(() => { syncSubscriptions(); renderApp(); });
 
 Data.onAuth((user) => {
   Object.keys(subs).forEach((k) => { subs[k](); delete subs[k]; }); // drop the previous account's listeners
+  knownReservations = null;
   Store.set({
     authReady: true, authUser: user,
     owner: null, ownerLoaded: false, link: null, linkLoaded: false,
@@ -279,6 +356,7 @@ Data.onAuth((user) => {
   });
 });
 
+PWA.init(renderApp);
 renderApp();
 
 // Keep "free / busy" statuses fresh; avoid a full re-render while typing.
