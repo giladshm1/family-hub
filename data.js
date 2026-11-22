@@ -10,6 +10,7 @@
  *   reservations/{id}   { carId, memberId, uid, start, end, note, createdAt }
  *   shopping/{id}       { text, qty, addedBy, uid, done, doneBy, doneAt, createdAt }
  *   parking/{carId}     { text, lat?, lng?, by, uid, at }   where each car is parked
+ *   events/{id}         { title, date, time, location, notes, createdBy, uid, createdAt, rsvp: { [memberId]: 'yes'|'no' } }
  * Permissions are enforced server-side in firestore.rules.
  * ===================================================================== */
 
@@ -20,7 +21,7 @@ import {
 import {
   initializeFirestore, getFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, collection, onSnapshot, setDoc, addDoc, deleteDoc, updateDoc, writeBatch, increment,
-  query, where, getDocs,
+  query, where, getDocs, deleteField,
 } from 'https://www.gstatic.com/firebasejs/13.4.0/firebase-firestore.js';
 import { FIREBASE_CONFIG, APP_CONFIG, DEFAULT_MEMBERS } from './config.js';
 
@@ -111,6 +112,14 @@ export const Data = {
   // ---------- Reservations ----------
   addReservation: (r) => addDoc(collection(db, 'reservations'), r),
   cancelReservation: (id) => deleteDoc(doc(db, 'reservations', id)),
+
+  // ---------- Family events ----------
+  watchEvents: (cb) => onSnapshot(collection(db, 'events'), (s) => cb(docsOf(s)), onErr('events')),
+  addEvent: (e) => addDoc(collection(db, 'events'), e),
+  updateEvent: (id, patch) => updateDoc(doc(db, 'events', id), patch),
+  deleteEvent: (id) => deleteDoc(doc(db, 'events', id)),
+  /** answer: 'yes' | 'no' | null (clear) — only touches the member's own answer. */
+  setRsvp: (id, memberId, answer) => updateDoc(doc(db, 'events', id), { [`rsvp.${memberId}`]: answer || deleteField() }),
 
   // ---------- Parking ----------
   watchParking: (cb) => onSnapshot(collection(db, 'parking'), (s) =>
