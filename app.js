@@ -31,6 +31,7 @@ function syncSubscriptions() {
   ensureSub('reservations', linked, () => Data.watchReservations(onReservations));
   ensureSub('shopping', linked, () => Data.watchShopping((shopping) => Store.set({ shopping })));
   ensureSub('parking', linked, () => Data.watchParking((parking) => Store.set({ parking })));
+  ensureSub('events', linked, () => Data.watchEvents(onEvents));
   const admin = linked && s.membersLoaded && Store.isAdmin();
   ensureSub('pending', admin, () => Data.watchPending((pending) => Store.set({ pending })));
   ensureSub('links', admin, () => Data.watchLinks((links) => Store.set({ links })));
@@ -65,6 +66,25 @@ function announceBooking(r) {
   const body = `${who} שריין/ה את ${car} · ${Utils.dayLabel(r.start)} ${Utils.fmtTime(r.start)}–${Utils.fmtTime(r.end)}${r.note ? ` · ${r.note}` : ''}`;
   if (document.visibilityState === 'visible') Toast.show(`🚗 ${body}`, 'info');
   else Notify.show('שריון רכב חדש 🚗', body, `res-${r.id}`);
+}
+
+// Same for new family events.
+let knownEvents = null;
+
+function onEvents(events) {
+  const myUid = Store.state.authUser?.uid;
+  if (knownEvents) {
+    events.filter((e) => !knownEvents.has(e.id) && e.uid !== myUid && Date.now() - (e.createdAt || 0) < 10 * 60 * 1000)
+      .forEach((e) => {
+        const who = Store.memberById(e.createdBy)?.name || 'מישהו';
+        const [y, m, d] = e.date.split('-').map(Number);
+        const body = `${e.title} · ${Utils.dayLabel(new Date(y, m - 1, d).getTime())}${e.time ? ` ${e.time}` : ''} (נוסף ע״י ${who}) — מגיעים?`;
+        if (document.visibilityState === 'visible') Toast.show(`📅 ${body}`, 'info');
+        else Notify.show('אירוע משפחתי חדש 📅', body, `ev-${e.id}`);
+      });
+  }
+  knownEvents = new Set(events.map((e) => e.id));
+  Store.set({ events });
 }
 
 /* ---------------------------------------------------------------------
@@ -350,10 +370,11 @@ Store.subscribe(() => { syncSubscriptions(); renderApp(); });
 Data.onAuth((user) => {
   Object.keys(subs).forEach((k) => { subs[k](); delete subs[k]; }); // drop the previous account's listeners
   knownReservations = null;
+  knownEvents = null;
   Store.set({
     authReady: true, authUser: user,
     owner: null, ownerLoaded: false, link: null, linkLoaded: false,
-    members: [], membersLoaded: false, reservations: [], shopping: [], parking: {}, pending: [], links: [],
+    members: [], membersLoaded: false, reservations: [], shopping: [], parking: {}, events: [], pending: [], links: [],
   });
 });
 
