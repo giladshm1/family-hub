@@ -9,6 +9,7 @@
  *   pending/{uid}       { email, name, photoURL, at } sign-ins waiting for an admin
  *   reservations/{id}   { carId, memberId, uid, start, end, note, createdAt }
  *   shopping/{id}       { text, qty, addedBy, uid, done, doneBy, doneAt, createdAt }
+ *   parking/{carId}     { text, lat?, lng?, by, uid, at }   where each car is parked
  * Permissions are enforced server-side in firestore.rules.
  * ===================================================================== */
 
@@ -110,6 +111,11 @@ export const Data = {
   // ---------- Reservations ----------
   addReservation: (r) => addDoc(collection(db, 'reservations'), r),
   cancelReservation: (id) => deleteDoc(doc(db, 'reservations', id)),
+
+  // ---------- Parking ----------
+  watchParking: (cb) => onSnapshot(collection(db, 'parking'), (s) =>
+    cb(Object.fromEntries(s.docs.map((d) => [d.id, d.data()]))), onErr('parking')),
+  setParking: (carId, data) => setDoc(doc(db, 'parking', carId), data),
 
   // ---------- Shopping list ----------
   watchShopping: (cb) => onSnapshot(collection(db, 'shopping'), (s) => cb(docsOf(s)), onErr('shopping')),
