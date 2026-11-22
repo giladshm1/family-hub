@@ -71,7 +71,7 @@ function renderSignedOut() {
     <p class="anim-fade-up mt-3 text-slate-500 text-lg" style="animation-delay:120ms">טבלת הכלים, שריון הרכבים וכל מה שהמשפחה צריכה — מסונכרן לכולם.</p>
     <div class="anim-fade-up mt-9" style="animation-delay:180ms">${googleButton()}</div>
     <div class="anim-fade-up mt-10 grid grid-cols-3 gap-3 text-sm text-slate-500" style="animation-delay:240ms">
-      ${[['utensils', 'אלופי הכלים'], ['car', 'שריון רכבים'], ['refresh-cw', 'סנכרון חי']].map(([i, t]) =>
+      ${[['utensils', 'ניקוד שטיפת כלים'], ['car', 'שריון רכבים'], ['refresh-cw', 'סנכרון חי']].map(([i, t]) =>
         `<div class="rounded-2xl bg-white/80 border border-white shadow-soft p-4">${icon(i, 'w-5 h-5 mx-auto text-indigo-500')}<div class="mt-2 font-semibold">${t}</div></div>`).join('')}
     </div>`);
 }
@@ -151,7 +151,7 @@ function renderDashboard() {
   const animate = view !== lastView;
   lastView = view;
 
-  const frame = (w, full, delay = 0) => `
+  const frame = (w, full, delay = 0, overview = false) => `
     <section class="card ${full ? '' : w.span} ${animate ? 'anim-fade-up' : ''}" style="animation-delay:${delay}ms" id="widget-${w.id}">
       <header class="mb-5 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3 min-w-0">
@@ -163,11 +163,11 @@ function renderDashboard() {
         </div>
         ${w.headerExtra ? w.headerExtra(ctx) : ''}
       </header>
-      ${w.render(ctx)}
+      ${overview && w.renderOverview ? w.renderOverview(ctx) : w.render(ctx)}
     </section>`;
 
   const content = activeTab === 'overview'
-    ? `<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">${widgets.map((w, i) => frame(w, false, i * 80)).join('')}</div>`
+    ? `<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">${widgets.filter((w) => w.inOverview !== false).map((w, i) => frame(w, false, i * 80, true)).join('')}</div>`
     : `<div class="max-w-5xl mx-auto">${frame(widgets.find((w) => w.id === activeTab), true)}</div>`;
 
   const tabsHtml = `
