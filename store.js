@@ -14,6 +14,7 @@ export const Store = {
     members: [], membersLoaded: false,
     reservations: [],
     shopping: [],         // shared shopping list items
+    parking: {},          // { [carId]: { text, lat, lng, by, at } }
     pending: [],          // admin only
     links: [],            // admin only
     activeTab: savedTab || 'overview',
