@@ -61,5 +61,22 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if isAdmin() || (isLinked() && resource.data.memberId == myMemberId());
     }
+
+    // Shared shopping list: anyone in the family adds (as themselves), checks off, and removes.
+    match /shopping/{id} {
+      allow read: if isLinked();
+      allow create: if isLinked()
+        && request.resource.data.keys().hasOnly(['text', 'qty', 'addedBy', 'uid', 'done', 'createdAt'])
+        && request.resource.data.addedBy == myMemberId()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 60
+        && request.resource.data.qty is string && request.resource.data.qty.size() <= 20
+        && request.resource.data.done == false;
+      allow update: if isLinked()
+        && changed().hasOnly(['done', 'doneBy', 'doneAt'])
+        && request.resource.data.done is bool;
+      allow delete: if isLinked();
+    }
   }
 }
